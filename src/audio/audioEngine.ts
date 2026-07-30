@@ -53,8 +53,6 @@ class AudioEngine {
       this.reverbNode = this.ctx.createConvolver();
       this.reverbNode.buffer = this.createImpulseResponse(3.5, 2.0);
 
-      // Routing: input -> dryGain -> compressor -> masterGain -> destination
-      //        \-> reverbNode -> wetGain -> compressor
       this.dryGain.connect(this.compressor);
       this.reverbNode.connect(this.wetGain);
       this.wetGain.connect(this.compressor);
@@ -141,7 +139,7 @@ class AudioEngine {
     lfoGain.connect(this.windFilter.frequency);
     lfo.start();
 
-    // Water Stream Synth (Low-pass filtered rumbling stream noise)
+    // Water Stream Synth
     const waterBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const wData = waterBuffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
@@ -232,9 +230,8 @@ class AudioEngine {
     if (!this.ctx || !this.dryGain || !this.reverbNode) return;
     const now = this.ctx.currentTime;
 
-    // Spatial Panner based on xRatio (-1 to 1)
     const panner = this.ctx.createStereoPanner();
-    const panVal = (inst.xRatio - 0.5) * 1.6; // -0.8 left to 0.8 right
+    const panVal = (inst.xRatio - 0.5) * 1.6;
     panner.pan.setValueAtTime(Math.max(-0.95, Math.min(0.95, panVal)), now);
 
     const instGain = this.ctx.createGain();
@@ -264,16 +261,13 @@ class AudioEngine {
     }
   }
 
-  // Synthesis for Glass Wind Chime (Fūrin)
   private synthGlassFurin(freq: number, decay: number, destination: GainNode, now: number, isLowGlass = false) {
     if (!this.ctx) return;
 
-    // Fundamental Sine
     const osc1 = this.ctx.createOscillator();
     osc1.type = 'sine';
     osc1.frequency.setValueAtTime(freq, now);
 
-    // High shimmer partial
     const osc2 = this.ctx.createOscillator();
     osc2.type = 'sine';
     osc2.frequency.setValueAtTime(freq * 2.76, now);
@@ -288,7 +282,6 @@ class AudioEngine {
     gain2.gain.linearRampToValueAtTime(isLowGlass ? 0.15 : 0.35, now + 0.005);
     gain2.gain.exponentialRampToValueAtTime(0.0001, now + (decay * 0.4));
 
-    // Highpass filter for glass crispness
     const hpFilter = this.ctx.createBiquadFilter();
     hpFilter.type = isLowGlass ? 'bandpass' : 'highpass';
     hpFilter.frequency.setValueAtTime(isLowGlass ? freq * 1.2 : 600, now);
@@ -305,7 +298,6 @@ class AudioEngine {
     osc2.stop(now + decay + 0.1);
   }
 
-  // Synthesis for Medium Bronze Bell
   private synthBronzeBell(freq: number, decay: number, destination: GainNode, now: number) {
     if (!this.ctx) return;
 
@@ -335,11 +327,9 @@ class AudioEngine {
     });
   }
 
-  // Synthesis for Muted Wooden Mokugyo
   private synthWoodMokugyo(freq: number, decay: number, destination: GainNode, now: number) {
     if (!this.ctx) return;
 
-    // Pitch sweep sine
     const osc = this.ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq * 1.6, now);
@@ -350,8 +340,7 @@ class AudioEngine {
     oscGain.gain.linearRampToValueAtTime(0.9, now + 0.002);
     oscGain.gain.exponentialRampToValueAtTime(0.0001, now + decay);
 
-    // Wooden strike noise click
-    const bufferSize = this.ctx.sampleRate * 0.04; // 40ms noise burst
+    const bufferSize = this.ctx.sampleRate * 0.04;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = noiseBuffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
@@ -382,14 +371,12 @@ class AudioEngine {
     osc.stop(now + decay + 0.1);
   }
 
-  // Synthesis for Grand Temple Bonshō Bell (Deep resonant low hum & beating partials)
   private synthTempleBonsho(freq: number, decay: number, destination: GainNode, now: number) {
     if (!this.ctx) return;
 
-    // Sub-harmonic hum
     const subOsc = this.ctx.createOscillator();
     subOsc.type = 'sine';
-    subOsc.frequency.setValueAtTime(freq * 0.5, now); // 55Hz
+    subOsc.frequency.setValueAtTime(freq * 0.5, now);
 
     const subGain = this.ctx.createGain();
     subGain.gain.setValueAtTime(0.0, now);
@@ -401,10 +388,9 @@ class AudioEngine {
     subOsc.start(now);
     subOsc.stop(now + decay + 0.1);
 
-    // Beating partials (Inharmonic bronze bell profile)
     const partials = [
       { f: freq * 1.0, g: 0.9, d: 1.0 },
-      { f: freq * 1.008, g: 0.85, d: 0.95 }, // Beats against 1.0 for slow pulsing hum
+      { f: freq * 1.008, g: 0.85, d: 0.95 },
       { f: freq * 2.01, g: 0.6, d: 0.8 },
       { f: freq * 3.03, g: 0.4, d: 0.6 },
       { f: freq * 4.25, g: 0.25, d: 0.4 },
@@ -430,7 +416,6 @@ class AudioEngine {
     });
   }
 
-  // Play water splash ripple sound when user taps the water surface
   public playWaterSplash() {
     if (!this.ctx || !this.dryGain) return;
     const now = this.ctx.currentTime;
@@ -450,6 +435,56 @@ class AudioEngine {
     gain.connect(this.dryGain);
     osc.start(now);
     osc.stop(now + 0.3);
+  }
+
+  // Play glissando cascade note across chime curtain columns
+  public playCascadeNote(colIndex: number, totalCols: number, velocity: number = 1.0) {
+    if (!this.ctx || !this.dryGain || !this.reverbNode) return;
+    const now = this.ctx.currentTime;
+
+    const scale = [
+      261.63, 293.66, 349.23, 392.00, 440.00,
+      523.25, 587.33, 698.46, 783.99, 880.00,
+      1046.50, 1174.66, 1396.91, 1567.98, 1760.00
+    ];
+
+    const noteIdx = Math.floor((colIndex / Math.max(1, totalCols - 1)) * (scale.length - 1));
+    const baseFreq = scale[Math.min(scale.length - 1, Math.max(0, noteIdx))];
+
+    const panner = this.ctx.createStereoPanner();
+    const panVal = (colIndex / totalCols - 0.5) * 1.8;
+    panner.pan.setValueAtTime(Math.max(-0.95, Math.min(0.95, panVal)), now);
+
+    const gain = this.ctx.createGain();
+    const vol = Math.min(0.6, Math.max(0.15, velocity * 0.4));
+    gain.gain.setValueAtTime(0.0, now);
+    gain.gain.linearRampToValueAtTime(vol, now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+
+    gain.connect(panner);
+    panner.connect(this.dryGain);
+    panner.connect(this.reverbNode);
+
+    const osc1 = this.ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(baseFreq, now);
+
+    const osc2 = this.ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(baseFreq * 2.76, now);
+
+    const hpFilter = this.ctx.createBiquadFilter();
+    hpFilter.type = 'highpass';
+    hpFilter.frequency.setValueAtTime(450, now);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(hpFilter);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + 1.7);
+    osc2.stop(now + 1.7);
   }
 }
 

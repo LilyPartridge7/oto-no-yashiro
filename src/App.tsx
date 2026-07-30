@@ -6,12 +6,15 @@ import { sequenceGenerator } from './audio/sequenceGenerator';
 import { useReducedMotion } from './hooks/useReducedMotion';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { ShrineScene } from './components/ShrineScene';
-import { AmbientControls } from './components/AmbientControls';
+import { CascadeChimeSlide } from './components/CascadeChimeSlide';
+import { ChimeKnowledgePage } from './components/ChimeKnowledgePage';
+import { AmbientControls, ViewMode } from './components/AmbientControls';
 import { EmaWishModal } from './components/EmaWishModal';
 import { IntroGate } from './components/IntroGate';
 
 export const App: React.FC = () => {
   const [hasEntered, setHasEntered] = useState<boolean>(false);
+  const [currentView, setCurrentView] = useState<ViewMode>('courtyard');
   const [currentMood, setCurrentMood] = useState<MoodDef>(MOODS[1]); // Twilight default
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isMelodyPlaying, setIsMelodyPlaying] = useState<boolean>(false);
@@ -74,13 +77,12 @@ export const App: React.FC = () => {
     if (!hasEntered) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore key events when typing inside Ema modal
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
         return;
       }
 
       const matchInst = INSTRUMENTS.find(inst => inst.keyCode === e.code);
-      if (matchInst) {
+      if (matchInst && currentView === 'courtyard') {
         audioEngine.playInstrument(matchInst, 1.0);
         triggerInstrumentById(matchInst.id);
         return;
@@ -98,7 +100,7 @@ export const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasEntered, triggerInstrumentById]);
+  }, [hasEntered, currentView, triggerInstrumentById]);
 
   // Calculate mouse velocity wind force
   useEffect(() => {
@@ -131,16 +133,28 @@ export const App: React.FC = () => {
         <IntroGate onEnter={handleEnterShrine} />
       ) : (
         <>
-          <ShrineScene
-            mood={currentMood}
-            reducedMotion={reducedMotion}
-            activeInstrumentId={activeInstrumentId}
-            windForce={windForce}
-            onOpenEmaModal={() => setIsEmaModalOpen(true)}
-            emaWish={emaWish}
-          />
+          {currentView === 'courtyard' && (
+            <ShrineScene
+              mood={currentMood}
+              reducedMotion={reducedMotion}
+              activeInstrumentId={activeInstrumentId}
+              windForce={windForce}
+              onOpenEmaModal={() => setIsEmaModalOpen(true)}
+              emaWish={emaWish}
+            />
+          )}
+
+          {currentView === 'cascade' && (
+            <CascadeChimeSlide reducedMotion={reducedMotion} />
+          )}
+
+          {currentView === 'knowledge' && (
+            <ChimeKnowledgePage />
+          )}
 
           <AmbientControls
+            currentView={currentView}
+            onSelectView={(view) => setCurrentView(view)}
             currentMood={currentMood}
             onSelectMood={handleSelectMood}
             isMuted={isMuted}
