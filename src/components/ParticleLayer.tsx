@@ -182,5 +182,5 @@ export const ParticleLayer: React.FC<ParticleLayerProps> = ({ mood, reducedMotio
     };
   }, [mood, reducedMotion, windForce]);
 
-  return <canvas ref={canvasRef} class="absolute inset-0 pointer-events-none z-10" />;
+  return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-10" />;
 };
